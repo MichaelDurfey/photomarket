@@ -4,6 +4,9 @@ export default {
   darkMode: false, // or 'media' or 'class'
   theme: {
     extend: {},
+    colors: {
+      green: "#d9f99d",
+    },
   },
   variants: {
     extend: {},

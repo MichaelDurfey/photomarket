@@ -8,9 +8,21 @@ const cookieParser = require("cookie-parser");
 
 const app = express();
 const PORT = 3000;
+const siteOrigin = "http://localhost";
 const SECRET_KEY = "your_secret_key"; // Use a strong secret key in production
 
-app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (origin.indexOf(siteOrigin) !== -1) {
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+    credentials: true,
+  })
+);
 app.use(bodyParser.json());
 app.use(cookieParser());
 
@@ -63,8 +75,7 @@ const authenticateToken = (req, res, next) => {
   });
 };
 
-// Protected route example
-app.get("/api/photos", authenticateToken, (req, res) => {
+app.get("/api/photos", (req, res) => {
   res.json(photos);
 });
 

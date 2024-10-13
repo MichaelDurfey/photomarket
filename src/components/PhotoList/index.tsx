@@ -18,7 +18,12 @@ const PhotoList: React.FC = () => {
       try {
         const response = await axios.get<Photo[]>(
           "http://localhost:3000/api/photos",
-          { withCredentials: true }
+          {
+            withCredentials: true,
+            headers: {
+              "Access-Control-Allow-Origin": "http://localhost:5173",
+            },
+          }
         );
         setPhotos(response.data);
       } catch (err) {

@@ -6,7 +6,7 @@ const Header: React.FC = () => {
 
   return (
     <header style={headerStyle}>
-      <h1 style={titleStyle}>Amalfi Coast Photography</h1>
+      <h1 style={titleStyle}>Photography</h1>
       <div style={buttonContainerStyle}>
         <button style={buttonStyle} onClick={() => navigate("/login")}>
           Login
@@ -26,7 +26,7 @@ const headerStyle: React.CSSProperties = {
   padding: "10px 20px",
   backgroundColor: "#282c34",
   color: "white",
-  position: "absolute",
+  position: "relative",
   top: 0,
   width: "100%",
 };
