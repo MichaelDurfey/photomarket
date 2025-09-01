@@ -1,19 +1,22 @@
 const express = require("express");
 const cors = require("cors");
-const bodyParser = require("body-parser");
-const fs = require("fs");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
 const cookieParser = require("cookie-parser");
+const { ApolloServer } = require("apollo-server-express");
+const typeDefs = require("./schema");
+const resolvers = require("./resolvers");
+const { createContext } = require("./auth");
 
 const app = express();
 const PORT = 3000;
 const siteOrigin = "http://localhost";
-const SECRET_KEY = "your_secret_key"; // Use a strong secret key in production
 
+// CORS configuration
 app.use(
   cors({
     origin: function (origin, callback) {
+      // Allow requests with no origin (like mobile apps or curl requests)
+      if (!origin) return callback(null, true);
+
       if (origin.indexOf(siteOrigin) !== -1) {
         callback(null, true);
       } else {
@@ -23,62 +26,57 @@ app.use(
     credentials: true,
   })
 );
-app.use(bodyParser.json());
+
 app.use(cookieParser());
 
-// Mock database
-const photos = JSON.parse(fs.readFileSync("photos.json", "utf-8"));
-const users = JSON.parse(fs.readFileSync("users.json", "utf-8"));
+// Create Apollo Server
+const server = new ApolloServer({
+  typeDefs,
+  resolvers,
+  context: createContext,
+  formatError: (error) => {
+    // Log the error for debugging
+    console.error("GraphQL Error", error);
 
-// Helper function to generate JWT
-const generateToken = (user) => {
-  return jwt.sign({ id: user.id, username: user.username }, SECRET_KEY, {
-    expiresIn: "1h",
+    // Return a user-friendly error message
+    return {
+      message: error.message,
+      code: error.extensions?.code || "INTERNAL_SERVER_ERROR",
+    };
+  },
+  plugins: [
+    {
+      requestDidStart: () => ({
+        willSendResponse({ response }) {
+          // Log successful operations
+          if (response.data) {
+            console.log("GraphQL Operation", response.data);
+          }
+        },
+      }),
+    },
+  ],
+});
+
+// Start the server
+async function startServer() {
+  await server.start();
+
+  // Apply Apollo Server middleware to Express
+  server.applyMiddleware({
+    app,
+    cors: false, // We're handling CORS with Express
+    path: "/graphql",
   });
-};
 
-// Register endpoint
-app.post("/api/register", async (req, res) => {
-  const { username, password } = req.body;
-  const hashedPassword = await bcrypt.hash(password, 10);
-  const newUser = { id: users.length + 1, username, password: hashedPassword };
-  users.push(newUser);
-  fs.writeFileSync("users.json", JSON.stringify(users, null, 2));
-  res.status(201).json({ message: "User registered successfully" });
-});
-
-// Login endpoint
-app.post("/api/login", async (req, res) => {
-  const { username, password } = req.body;
-  const user = users.find((u) => u.username === username);
-  if (user && (await bcrypt.compare(password, user.password))) {
-    const token = generateToken(user);
-    res.cookie("token", token, {
-      httpOnly: true, // only accessible via http request and not javascript
-      secure: process.env.NODE_ENV === "production", // Cookie is only sent over HTTPS connections. Should be set to true in production environments
-      sameSite: "Strict", // mitigate CSRF attacks. Send cookie only for same origin (first party contexts)
-    });
-    res.json({ token });
-  } else {
-    res.status(401).json({ message: "Invalid credentials" });
-  }
-});
-
-// Middleware to authenticate JWT
-const authenticateToken = (req, res, next) => {
-  const token = req.cookies.token;
-  if (!token) return res.sendStatus(401);
-  jwt.verify(token, SECRET_KEY, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
+  app.listen(PORT, () => {
+    console.log(
+      `🚀 Apollo Server ready at http://localhost:${PORT}${server.graphqlPath}`
+    );
+    console.log(
+      `📊 GraphQL Playground available at http://localhost:${PORT}${server.graphqlPath}`
+    );
   });
-};
+}
 
-app.get("/api/photos", (req, res) => {
-  res.json(photos);
-});
-
-app.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-});
+startServer().catch(console.error);
