@@ -7,4 +7,5 @@ export default {
   },
   // Server-side rendering configuration
   serverModuleFormat: "esm",
+  ssr: true,
 };

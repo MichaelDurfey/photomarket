@@ -2,15 +2,28 @@ import { StrictMode } from "react";
 import { hydrateRoot } from "react-dom/client";
 import { RouterProvider } from "react-router";
 import { createBrowserRouter } from "react-router";
-import Index from "./routes/_index";
-import Login from "./routes/login";
-import Register from "./routes/register";
+import { createClient } from "./lib/apollo-client";
+import { ApolloProvider } from "@apollo/client";
+import Root from "./root";
+import Index from "./index";
+import Login from "./login";
+import Register from "./register";
+
+// Get Apollo cache state from SSR if available
+const apolloState = (window as any).__APOLLO_STATE__;
+
+// Create Apollo Client with SSR cache state
+const apolloClient = createClient(apolloState);
 
 const router = createBrowserRouter([
   {
     path: "/",
-    element: <Index />,
+    element: <Root />,
     children: [
+      {
+        index: true,
+        element: <Index {...({} as any)} />,
+      },
       {
         path: "login",
         element: <Login />,
@@ -32,6 +45,8 @@ if (!container) {
 hydrateRoot(
   container,
   <StrictMode>
-    <RouterProvider router={router} />
+    <ApolloProvider client={apolloClient}>
+      <RouterProvider router={router} />
+    </ApolloProvider>
   </StrictMode>
 );

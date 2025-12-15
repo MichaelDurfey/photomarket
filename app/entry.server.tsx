@@ -1,4 +1,5 @@
 import { PassThrough } from "stream";
+import { ApolloProvider } from "@apollo/client";
 
 import type { AppLoadContext, EntryContext } from "react-router";
 import { createReadableStreamFromReadable } from "@react-router/node";
@@ -6,6 +7,7 @@ import { ServerRouter } from "react-router";
 import { isbot } from "isbot";
 import type { RenderToPipeableStreamOptions } from "react-dom/server";
 import { renderToPipeableStream } from "react-dom/server";
+import { createServerClient } from "./lib/apollo-client-server";
 
 export const streamTimeout = 5_000;
 
@@ -15,15 +17,21 @@ export default function handleRequest(
   responseHeaders: Headers,
   routerContext: EntryContext,
   loadContext: AppLoadContext
-  // If you have middleware enabled:
-  // loadContext: unstable_RouterContextProvider
 ) {
   return new Promise((resolve, reject) => {
     let shellRendered = false;
     let userAgent = request.headers.get("user-agent");
+    let apolloCache: any = null;
+
+    // Create Apollo Client for this request
+    const cookieHeader = request.headers.get("cookie") || undefined;
+    const apolloClient = createServerClient(cookieHeader);
+
+    // Add Apollo Client to load context - React Router 7 passes this to loaders via context
+    // Modify loadContext directly (it should be passed by reference to loaders)
+    (loadContext as any).apolloClient = apolloClient;
 
     // Ensure requests from bots and SPA Mode renders wait for all content to load before responding
-    // https://react.dev/reference/react-dom/server/renderToPipeableStream#waiting-for-all-content-to-load-for-crawlers-and-static-generation
     let readyOption: keyof RenderToPipeableStreamOptions =
       (userAgent && isbot(userAgent)) || routerContext.isSpaMode
         ? "onAllReady"
@@ -37,26 +45,58 @@ export default function handleRequest(
     );
 
     const { pipe, abort } = renderToPipeableStream(
-      <ServerRouter context={routerContext} url={request.url} />,
+      <ApolloProvider client={apolloClient}>
+        <ServerRouter context={routerContext} url={request.url} />
+      </ApolloProvider>,
       {
         [readyOption]() {
           shellRendered = true;
+
+          // Extract Apollo cache state
+          apolloCache = apolloClient.cache.extract();
+
           const body = new PassThrough({
             final(callback: () => void) {
-              // Clear the timeout to prevent retaining the closure and memory leak
               clearTimeout(timeoutId);
               timeoutId = undefined;
               callback();
             },
           });
+
+          // Transform stream to inject Apollo cache script
+          let buffer = "";
+          const transform = new TransformStream({
+            transform(chunk, controller) {
+              buffer += new TextDecoder().decode(chunk);
+
+              // Inject script before </body> tag
+              if (
+                buffer.includes("</body>") &&
+                !buffer.includes("__APOLLO_STATE__")
+              ) {
+                const cacheScript = `<script>window.__APOLLO_STATE__=${JSON.stringify(apolloCache).replace(/</g, "\\u003c")};</script>`;
+                buffer = buffer.replace("</body>", `${cacheScript}</body>`);
+              }
+
+              controller.enqueue(new TextEncoder().encode(buffer));
+              buffer = "";
+            },
+            flush(controller) {
+              if (buffer) {
+                controller.enqueue(new TextEncoder().encode(buffer));
+              }
+            },
+          });
+
           const stream = createReadableStreamFromReadable(body);
+          const transformedStream = stream.pipeThrough(transform);
 
           responseHeaders.set("Content-Type", "text/html");
 
           pipe(body);
 
           resolve(
-            new Response(stream, {
+            new Response(transformedStream, {
               headers: responseHeaders,
               status: responseStatusCode,
             })
@@ -67,9 +107,6 @@ export default function handleRequest(
         },
         onError(error: unknown) {
           responseStatusCode = 500;
-          // Log streaming rendering errors from inside the shell.  Don't log
-          // errors encountered during initial shell rendering since they'll
-          // reject and get logged in handleDocumentRequest.
           if (shellRendered) {
             console.error(error);
           }

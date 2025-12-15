@@ -1,6 +1,7 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const fs = require("fs");
+const adobeLightroom = require("./services/adobe-lightroom");
 
 const SECRET_KEY = "your_secret_key"; // Use a strong secret key in production
 
@@ -37,12 +38,53 @@ const saveUsers = (users) => {
 
 const resolvers = {
   Query: {
-    photos: () => {
+    photos: async () => {
+      console.log("🔍 GraphQL photos query called");
+      
+      // Check if Adobe is connected
+      if (!adobeLightroom.isConnected()) {
+        console.log("  → Adobe not connected, using local photos");
+        const { photos } = loadData();
+        return photos;
+      }
+
+      try {
+        console.log("  → Attempting to fetch from Adobe Lightroom...");
+        // Try to fetch from Adobe Lightroom first
+        const adobePhotos = await adobeLightroom.getPhotos();
+        console.log(`  → Adobe returned ${adobePhotos?.length || 0} photos`);
+        
+        if (adobePhotos && adobePhotos.length > 0) {
+          console.log("  ✅ Returning Adobe photos");
+          return adobePhotos;
+        } else {
+          console.log("  ⚠️  Adobe returned empty array, falling back to local photos");
+        }
+      } catch (error) {
+        console.error("  ❌ Error fetching from Adobe:", error.message);
+        console.error("  ❌ Error stack:", error.stack);
+        console.warn("Adobe Lightroom API not available, falling back to local photos:", error.message);
+      }
+
+      // Fallback to local JSON file if Adobe API is not configured or fails
+      console.log("  → Loading local photos from photos.json");
       const { photos } = loadData();
       return photos;
     },
 
-    photo: (_, { id }) => {
+    photo: async (_, { id }) => {
+      try {
+        // Try to fetch from Adobe Lightroom first
+        const adobePhotos = await adobeLightroom.getPhotos();
+        const photo = adobePhotos.find((p) => p.id.toString() === id);
+        if (photo) {
+          return photo;
+        }
+      } catch (error) {
+        console.warn("Adobe Lightroom API not available, falling back to local photos:", error.message);
+      }
+
+      // Fallback to local JSON file
       const { photos } = loadData();
       return photos.find((photo) => photo.id.toString() === id);
     },
