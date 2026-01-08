@@ -26,6 +26,7 @@ export default function handleRequest(
     // Create Apollo Client for this request
     const cookieHeader = request.headers.get("cookie") || undefined;
     const apolloClient = createServerClient(cookieHeader);
+    console.log("loadContext-entry.server.tsx", loadContext);
 
     // Add Apollo Client to load context - React Router 7 passes this to loaders via context
     // Modify loadContext directly (it should be passed by reference to loaders)

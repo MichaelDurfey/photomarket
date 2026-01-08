@@ -18,7 +18,7 @@ interface PhotosData {
 export async function loader(args: Route.LoaderArgs) {
   // React Router 7 passes loadContext as context in loader args
   const apolloClient = (args.context as any)?.apolloClient;
-
+  console.log("apolloClient", apolloClient);
   if (apolloClient) {
     try {
       const result = await apolloClient.query({
