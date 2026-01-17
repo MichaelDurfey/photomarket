@@ -16,10 +16,18 @@ interface PhotosData {
 
 // Loader function for SSR data fetching
 export async function loader(args: Route.LoaderArgs) {
+  console.log("🔍 Loader called in index.tsx");
+  console.log("   args.context keys:", Object.keys(args.context || {}));
+
   // React Router 7 passes loadContext as context in loader args
   const apolloClient = (args.context as any)?.apolloClient;
-  console.log("apolloClient", apolloClient);
+  console.log(
+    "   apolloClient in loader:",
+    apolloClient ? "found ✅" : "MISSING ❌"
+  );
+
   if (apolloClient) {
+    console.log("   → Using Apollo Client to fetch photos");
     try {
       const result = await apolloClient.query({
         query: GET_PHOTOS,

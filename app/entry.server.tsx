@@ -18,20 +18,22 @@ export default function handleRequest(
   routerContext: EntryContext,
   loadContext: AppLoadContext
 ) {
+  // Create Apollo Client for this request FIRST, before any async operations
+  const cookieHeader = request.headers.get("cookie") || undefined;
+  const apolloClient = createServerClient(cookieHeader);
+
+  // Add Apollo Client to load context IMMEDIATELY - React Router 7 passes this to loaders via context
+  // This must be done before renderToPipeableStream is called, as loaders execute during rendering
+  (loadContext as any).apolloClient = apolloClient;
+
+  console.log("🔧 loadContext populated in entry.server.tsx");
+  console.log("   apolloClient:", apolloClient ? "created" : "MISSING");
+  console.log("   loadContext keys:", Object.keys(loadContext));
+
   return new Promise((resolve, reject) => {
     let shellRendered = false;
     let userAgent = request.headers.get("user-agent");
     let apolloCache: any = null;
-
-    // Create Apollo Client for this request
-    const cookieHeader = request.headers.get("cookie") || undefined;
-    const apolloClient = createServerClient(cookieHeader);
-    console.log("loadContext-entry.server.tsx", loadContext);
-
-    // Add Apollo Client to load context - React Router 7 passes this to loaders via context
-    // Modify loadContext directly (it should be passed by reference to loaders)
-    (loadContext as any).apolloClient = apolloClient;
-
     // Ensure requests from bots and SPA Mode renders wait for all content to load before responding
     let readyOption: keyof RenderToPipeableStreamOptions =
       (userAgent && isbot(userAgent)) || routerContext.isSpaMode
