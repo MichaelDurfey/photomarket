@@ -1,7 +1,7 @@
 # Lightroom Photo Store
 
 A modern photo store application built with React Router 7, React 19 Server Components, and GraphQL with Apollo Server.
-This story utilizes the Lightroom APIs for Oauth, to retrieve catalogs, assets and renditions.
+Connects with the Adobe Lightroom APIs for Oauth, catalogs, assets and renditions.
 
 ## Features
 
