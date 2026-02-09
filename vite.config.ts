@@ -6,6 +6,13 @@ export default defineConfig({
   plugins: [reactRouter()],
   server: {
     port: 3001,
+    proxy: {
+      "/api": {
+        target: "https://localhost:3000",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   build: {
     outDir: "dist",

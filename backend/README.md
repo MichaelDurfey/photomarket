@@ -18,6 +18,21 @@ npm run dev
 
 3. The GraphQL playground will be available at: `http://localhost:3000/graphql`
 
+### Using HTTPS locally
+
+The server can terminate HTTPS itself. Set `HTTPS_ENABLED=true` in `.env` and provide `SSL_KEY_PATH` and `SSL_CERT_PATH` that point to your key and certificate files (and optional `SSL_PASSPHRASE`). For local testing you can generate a self-signed certificate:
+
+```bash
+mkdir -p backend/certs
+openssl req -x509 -newkey rsa:2048 -nodes \
+  -keyout backend/certs/localhost-key.pem \
+  -out backend/certs/localhost-cert.pem \
+  -days 365 \
+  -subj "/CN=localhost"
+```
+
+Then reference those paths in your `.env` file. When HTTPS is enabled the server logs will show `https://` URLs.
+
 ## GraphQL Schema
 
 ### Types

@@ -2,6 +2,7 @@ import { useQuery } from "@apollo/client";
 import { GET_PHOTOS } from "./lib/graphql";
 import type { Route } from ".react-router/types/app/+types/index";
 import AdobeConnect from "./components/AdobeConnect";
+import https from "node:https";
 
 interface Photo {
   id: number;
@@ -14,34 +15,82 @@ interface PhotosData {
   photos: Photo[];
 }
 
+interface NodeFetchRequestInit extends RequestInit {
+  agent?: https.Agent;
+}
+
+const allowInsecureSsl =
+  typeof process !== "undefined" && process.env.ALLOW_INSECURE_SSL === "true";
+
+if (allowInsecureSsl && typeof process !== "undefined") {
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+}
+
 // Loader function for SSR data fetching
 export async function loader(args: Route.LoaderArgs) {
   console.log("🔍 Loader called in index.tsx");
-  console.log("   args.context keys:", Object.keys(args.context || {}));
 
-  // React Router 7 passes loadContext as context in loader args
-  const apolloClient = (args.context as any)?.apolloClient;
-  console.log(
-    "   apolloClient in loader:",
-    apolloClient ? "found ✅" : "MISSING ❌"
-  );
+  // Fetch directly from GraphQL API for SSR (loadContext is populated after loaders run)
+  // For SSR, we'll fetch directly from the backend GraphQL endpoint
+  const graphqlUrl =
+    process.env.GRAPHQL_URL || "https://localhost:3000/graphql";
 
-  if (apolloClient) {
-    console.log("   → Using Apollo Client to fetch photos");
-    try {
-      const result = await apolloClient.query({
-        query: GET_PHOTOS,
-        fetchPolicy: "network-only", // Always fetch fresh data on server
-      });
-      const data = result.data as PhotosData;
-      return { photos: data.photos };
-    } catch (error) {
-      console.error("Error fetching photos:", error);
+  console.log(`  → Fetching from GraphQL endpoint: ${graphqlUrl}`);
+
+  const agent =
+    allowInsecureSsl && typeof window === "undefined"
+      ? new https.Agent({
+          rejectUnauthorized: false,
+        })
+      : undefined;
+
+  try {
+    const fetchOptions: NodeFetchRequestInit = {
+      method: "POST",
+      ...(agent ? { agent } : {}),
+      headers: {
+        "Content-Type": "application/json",
+        // Pass cookies for authentication if available
+        ...(args.request?.headers?.get("cookie") && {
+          Cookie: args.request.headers.get("cookie")!,
+        }),
+      },
+      body: JSON.stringify({
+        query: `
+          query GetPhotos {
+            photos(albumName: "Europe 2025") {
+              id
+              title
+              url
+              price
+            }
+          }
+        `,
+      }),
+    };
+
+    const response = await fetch(graphqlUrl, fetchOptions);
+
+    if (!response.ok) {
+      throw new Error(`GraphQL request failed: ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (result.errors) {
+      console.error("GraphQL errors:", result.errors);
       return { photos: [] };
     }
-  }
 
-  return { photos: [] };
+    const data = result.data as PhotosData;
+    console.log(
+      `✅ Loader fetched ${data.photos?.length || 0} photos from GraphQL`,
+    );
+    return { photos: data.photos || [] };
+  } catch (error) {
+    console.error("❌ Error fetching photos in loader:", error);
+    return { photos: [] };
+  }
 }
 
 export default function Index(props: Route.ComponentProps) {
@@ -82,9 +131,13 @@ export default function Index(props: Route.ComponentProps) {
             {photos.map((photo: Photo) => (
               <div
                 key={photo.id}
-                className="max-w-sm rounded overflow-hidden shadow-lg m-4"
+                className="w-[250px] rounded overflow-hidden shadow-lg m-4"
               >
-                <img className="w-full" src={photo.url} alt={photo.title} />
+                <img
+                  className="w-full max-w-[250px] h-auto"
+                  src={photo.url}
+                  alt={photo.title}
+                />
                 <div className="px-6 py-4">
                   <div className="font-bold text-xl mb-2">{photo.title}</div>
                   <p className="text-gray-700 text-base">${photo.price}</p>

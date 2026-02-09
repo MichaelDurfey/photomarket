@@ -1,4 +1,7 @@
 require("dotenv").config();
+const fs = require("fs");
+const http = require("http");
+const https = require("https");
 const express = require("express");
 const cors = require("cors");
 const cookieParser = require("cookie-parser");
@@ -9,10 +12,16 @@ const { createContext } = require("./auth");
 const adobeLightroom = require("./services/adobe-lightroom");
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
+const HTTPS_ENABLED = process.env.HTTPS_ENABLED === "true";
+const SSL_KEY_PATH = process.env.SSL_KEY_PATH;
+const SSL_CERT_PATH = process.env.SSL_CERT_PATH;
+const SSL_PASSPHRASE = process.env.SSL_PASSPHRASE;
 const allowedOrigins = [
   "http://localhost",
   "http://localhost:3001",
+  "https://localhost",
+  "https://localhost:3001",
   "https://studio.apollographql.com",
 ];
 
@@ -40,6 +49,51 @@ app.use(express.json());
 app.get("/auth/adobe", (req, res) => {
   const authUrl = adobeLightroom.getAuthorizationUrl();
   res.redirect(authUrl);
+});
+
+app.get("/api/adobe/albums", async (req, res) => {
+  try {
+    const albums = await adobeLightroom.getAlbums();
+    res.json(albums);
+  } catch (error) {
+    console.error("Albums error:", error.message);
+    res.status(error.message?.includes("401") ? 401 : 502).json({ error: error.message });
+  }
+});
+
+app.get("/api/adobe/photos", async (req, res) => {
+  const options = {
+    ...(req.query.limit && { limit: parseInt(req.query.limit, 10) }),
+    ...(req.query.offset && { offset: req.query.offset }),
+    ...(req.query.subtype && { subtype: req.query.subtype }),
+    ...(req.query.albumId && { albumId: req.query.albumId }),
+    ...(req.query.albumName && { albumName: req.query.albumName }),
+    ...(req.query.minRating != null && {
+      minRating: parseInt(req.query.minRating, 10),
+    }),
+  };
+  const photos = await adobeLightroom.getPhotos(options);
+  res.json(photos);
+});
+
+// Proxy for Adobe rendition images so <img src="..."> works without exposing the OAuth token.
+// Frontend uses photo.url (e.g. /api/adobe/rendition/:catalogId/:assetId?type=2048) with this server as origin.
+app.get("/api/adobe/rendition/:catalogId/:assetId", async (req, res) => {
+  const { catalogId, assetId } = req.params;
+  const type = req.query.type || "2048";
+  try {
+    const { buffer, contentType } = await adobeLightroom.getRendition(
+      catalogId,
+      assetId,
+      type
+    );
+    res.set("Content-Type", contentType);
+    res.set("Cache-Control", "private, max-age=3600");
+    res.send(buffer);
+  } catch (error) {
+    console.error("Rendition proxy error:", error.message);
+    res.status(error.message.includes("401") ? 401 : 502).send();
+  }
 });
 
 app.get("/auth/adobe/callback", async (req, res) => {
@@ -177,10 +231,10 @@ const server = new ApolloServer({
     {
       requestDidStart: () => ({
         willSendResponse({ response }) {
-          // Log successful operations
-          if (response.data) {
-            console.log("GraphQL Operation", response.data);
-          }
+          // // Log successful operations
+          // if (response.data) {
+          //   console.log("GraphQL Operation", response.data);
+          // }
         },
       }),
     },
@@ -198,12 +252,34 @@ async function startServer() {
     path: "/graphql",
   });
 
-  app.listen(PORT, () => {
+  const createListener = () => {
+    if (!HTTPS_ENABLED) {
+      return http.createServer(app);
+    }
+
+    if (!SSL_KEY_PATH || !SSL_CERT_PATH) {
+      throw new Error(
+        "HTTPS_ENABLED is true but SSL_KEY_PATH or SSL_CERT_PATH is not configured."
+      );
+    }
+
+    const httpsOptions = {
+      key: fs.readFileSync(SSL_KEY_PATH),
+      cert: fs.readFileSync(SSL_CERT_PATH),
+      passphrase: SSL_PASSPHRASE,
+    };
+    return https.createServer(httpsOptions, app);
+  };
+
+  const protocol = HTTPS_ENABLED ? "https" : "http";
+  const listener = createListener();
+
+  listener.listen(PORT, () => {
     console.log(
-      `🚀 Apollo Server ready at http://localhost:${PORT}${server.graphqlPath}`
+      `🚀 Apollo Server ready at ${protocol}://localhost:${PORT}${server.graphqlPath}`
     );
     console.log(
-      `📊 GraphQL Playground available at http://localhost:${PORT}${server.graphqlPath}`
+      `📊 GraphQL Playground available at ${protocol}://localhost:${PORT}${server.graphqlPath}`
     );
   });
 }

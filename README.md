@@ -95,6 +95,10 @@ The application will be available at:
 - GraphQL API: http://localhost:3000/graphql
 - GraphQL Playground: http://localhost:3000/graphql
 
+### Working with self-signed HTTPS
+
+If you terminate HTTPS locally with a self-signed certificate, Node's `fetch` (used by the SSR loader and Apollo server client) will reject it by default. To opt-in to insecure certificates during development, set `ALLOW_INSECURE_SSL=true` in your environment before starting the frontend dev server. The app will attach an HTTPS agent that disables certificate validation for server-side requests only; browsers still enforce their usual rules.
+
 ## React 19 Server Components
 
 This application demonstrates React 19 Server Components with React Router 7:

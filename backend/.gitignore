@@ -9,6 +9,9 @@ node_modules/
 # Adobe tokens (contains sensitive access tokens)
 adobe-tokens.json
 
+# SSL certs and keys (keep outside repo; set SSL_KEY_PATH/SSL_CERT_PATH in .env)
+certs/
+
 # Logs
 *.log
 npm-debug.log*

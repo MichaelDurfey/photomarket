@@ -18,8 +18,23 @@ const typeDefs = gql`
     user: User!
   }
 
+  type Album {
+    id: ID!
+    name: String
+  }
+
   type Query {
-    photos: [Photo!]!
+    "List albums (e.g. to find id for 'Europe 2025')."
+    albums: [Album!]!
+    "Optional: minRating (1-5), albumId, albumName (e.g. 'Europe 2025'), subtype, limit, offset"
+    photos(
+      minRating: Int
+      albumId: ID
+      albumName: String
+      subtype: String
+      limit: Int
+      offset: String
+    ): [Photo!]!
     photo(id: ID!): Photo
     me: User
   }
