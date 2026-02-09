@@ -1,64 +1,70 @@
 # Photo Store with React Router 7, React 19, and GraphQL
 
-A modern photo store application built with React Router 7, React 19 Server Components, and GraphQL with Apollo Server.
+A modern photo store application built with React Router 7, React 19, and GraphQL with Apollo Server. Optional **Adobe Lightroom** integration lets you connect your catalog and sell photos from your albums.
 
 ## Features
 
-- **React Router 7**: The latest version with full React 19 support
-- **React 19 Server Components**: Server-side rendering with modern React features
-- **GraphQL API**: Apollo Server backend with comprehensive schema
-- **Authentication**: JWT-based authentication with secure cookies
-- **Modern UI**: Tailwind CSS for beautiful, responsive design
-- **TypeScript**: Full type safety throughout the application
+- **React Router 7**: File-based routing with loaders and full React 19 support
+- **React 19**: Server-side data fetching via loaders and client-side Apollo Client
+- **GraphQL API**: Apollo Server backend with photos, albums, and auth
+- **Adobe Lightroom (optional)**: Connect your Adobe account to serve photos from your Lightroom catalog
+- **Authentication**: JWT-based authentication with HTTP-only cookies
+- **Modern UI**: Tailwind CSS for responsive layout
+- **TypeScript**: Type safety across the app
 
 ## Tech Stack
 
 ### Frontend
 
-- React 19 with Server Components
-- React Router 7
+- React 19 with React Router 7 (loaders for SSR)
 - Apollo Client for GraphQL
 - Tailwind CSS
 - TypeScript
 
 ### Backend
 
-- Apollo Server with Express
-- GraphQL schema and resolvers
-- JWT authentication
-- bcrypt for password hashing
+- Apollo Server with Express (optional HTTPS)
+- GraphQL schema and resolvers; optional Adobe Lightroom integration
+- JWT authentication (HTTP-only cookies), bcrypt for passwords
 
 ## Project Structure
 
 ```
 photostore/
-├── app/                    # React Router 7 app directory
-│   ├── routes/            # Route components
-│   │   ├── _index.tsx     # Home page with Server Components
-│   │   ├── login.tsx      # Login form
-│   │   └── register.tsx   # Registration form
-│   ├── lib/               # Utility libraries
-│   │   ├── apollo-client.ts    # Apollo Client config
-│   │   ├── graphql.ts          # GraphQL operations
-│   │   └── graphql-server.ts   # Server-side GraphQL client
-│   ├── tailwind.css       # Tailwind styles
-│   └── root.tsx           # Root component
-├── backend/                # GraphQL API server
-│   ├── server.js          # Apollo Server setup
-│   ├── schema.js          # GraphQL schema
-│   ├── resolvers.js       # GraphQL resolvers
-│   ├── auth.js            # Authentication middleware
-│   └── README.md          # API documentation
-├── react-router.config.js # React Router 7 configuration
-├── tailwind.config.js     # Tailwind CSS configuration
-└── package.json           # Dependencies and scripts
+├── app/                       # React Router 7 app
+│   ├── components/
+│   │   └── AdobeConnect/      # Adobe Lightroom connection status
+│   ├── lib/
+│   │   ├── apollo-client.ts       # Browser Apollo Client
+│   │   ├── apollo-client-server.ts # Server-side GraphQL client
+│   │   └── graphql.ts             # GraphQL operations
+│   ├── index.tsx              # Home route (photos grid, loader-based SSR)
+│   ├── login.tsx              # Login route
+│   ├── register.tsx           # Register route
+│   ├── routes.tsx             # Route definitions
+│   ├── root.tsx               # Root layout
+│   ├── entry.client.tsx       # Client entry
+│   ├── entry.server.tsx       # Server entry
+│   └── tailwind.css           # Tailwind styles
+├── backend/                   # GraphQL API server
+│   ├── server.js              # Apollo Server + Express (optional HTTPS)
+│   ├── schema.js              # GraphQL schema
+│   ├── resolvers.js           # GraphQL resolvers
+│   ├── auth.js                # JWT auth middleware
+│   ├── services/
+│   │   └── adobe-lightroom.js # Adobe Lightroom API integration
+│   ├── README.md              # API and HTTPS setup
+│   └── README_ADOBE.md        # Adobe Lightroom setup guide
+├── react-router.config.js     # React Router config
+├── tailwind.config.js         # Tailwind config
+└── package.json               # Dependencies and scripts
 ```
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 22+
 - npm or yarn
 
 ### Installation
@@ -83,7 +89,7 @@ cd backend
 npm run dev
 ```
 
-4. **Start the React Router 7 frontend:**
+4. **Start the React Router 7 frontend** (from the project root):
 
 ```bash
 npm run dev
@@ -91,51 +97,50 @@ npm run dev
 
 The application will be available at:
 
-- Frontend: http://localhost:3001 (or next available port)
-- GraphQL API: http://localhost:3000/graphql
-- GraphQL Playground: http://localhost:3000/graphql
+- **Frontend**: http://localhost:5173 (or next available port from Vite)
+- **GraphQL API**: http://localhost:3000/graphql (or https://localhost:3000/graphql if backend uses HTTPS)
+- **GraphQL Playground**: Same URL as GraphQL API
 
-### Working with self-signed HTTPS
+5. **Optional – Adobe Lightroom**: To serve photos from your Lightroom catalog, see [backend/README_ADOBE.md](backend/README_ADOBE.md) for OAuth setup and environment variables.
 
-If you terminate HTTPS locally with a self-signed certificate, Node's `fetch` (used by the SSR loader and Apollo server client) will reject it by default. To opt-in to insecure certificates during development, set `ALLOW_INSECURE_SSL=true` in your environment before starting the frontend dev server. The app will attach an HTTPS agent that disables certificate validation for server-side requests only; browsers still enforce their usual rules.
+### Environment (frontend)
 
-## React 19 Server Components
+Create a `.env` in the project root if needed:
 
-This application demonstrates React 19 Server Components with React Router 7:
+- `GRAPHQL_URL` – GraphQL endpoint (e.g. `http://localhost:3000/graphql` or `https://localhost:3000/graphql`).
+- `ALLOW_INSECURE_SSL=true` – Allow self-signed certs for server-side requests (e.g. when backend uses HTTPS with a local certificate). Browsers still use normal certificate validation.
 
-### Server Components
+### Backend HTTPS (optional)
 
-- **PhotoGrid**: Fetches data on the server and renders HTML
-- **Data Fetching**: Uses server-side GraphQL queries for better performance
-- **SEO**: Server-rendered content for better search engine optimization
+The backend can run over HTTPS for local testing. See [backend/README.md](backend/README.md) for `HTTPS_ENABLED`, `SSL_KEY_PATH`, and `SSL_CERT_PATH`.
 
-### Client Components
+## Data fetching and routing
 
-- **Forms**: Interactive login and registration forms
-- **Navigation**: Client-side routing with React Router 7
-- **State Management**: Apollo Client for GraphQL state management
+- **Loaders**: The home route uses a React Router loader to fetch photos from the GraphQL API on the server, so the initial HTML includes photo data (good for SEO and first paint).
+- **Client fallback**: Apollo Client is used in the browser for subsequent navigations and when loader data is not used.
+- **Forms**: Login and register are client-side forms with Apollo mutations.
+- **Routing**: Routes are defined in `app/routes.tsx` (index, login, register).
 
 ## GraphQL API
 
-The backend provides a comprehensive GraphQL API:
+The backend provides a GraphQL API; see [backend/README.md](backend/README.md) for the full schema and examples.
 
 ### Queries
 
-- `photos`: Get all photos
-- `photo(id)`: Get a specific photo
-- `me`: Get current user information
+- `albums`: List albums (e.g. from Adobe Lightroom)
+- `photos(minRating, albumId, albumName, subtype, limit, offset)`: List photos with optional filters (e.g. `albumName: "Europe 2025"`)
+- `photo(id)`: Get a single photo by ID
+- `me`: Current authenticated user
 
 ### Mutations
 
-- `register(username, password)`: Create a new user account
-- `login(username, password)`: Authenticate user
-- `logout`: Clear authentication
+- `register(username, password)`: Create a user account
+- `login(username, password)`: Sign in (sets HTTP-only cookie)
+- `logout`: Clear auth cookie
 
 ### Authentication
 
-- JWT tokens stored in HTTP-only cookies
-- Secure password hashing with bcrypt
-- Protected routes and operations
+- JWT in HTTP-only cookies; password hashing with bcrypt. The `me` query and protected operations require a valid cookie.
 
 ## Development
 
@@ -149,26 +154,26 @@ npm run start        # Start production server
 npm run typecheck    # TypeScript type checking
 ```
 
-### Key Features
+### Key features
 
-1. **Server Components**: The `PhotoGrid` component runs on the server and fetches data
-2. **Client Components**: Forms and interactive elements run in the browser
-3. **GraphQL Integration**: Seamless data fetching with Apollo Client
-4. **Type Safety**: Full TypeScript support throughout the application
-5. **Modern Routing**: React Router 7 with file-based routing
+1. **Loader-based SSR**: The index route loader fetches photos on the server for fast first load.
+2. **Apollo Client**: Used in the browser for GraphQL queries and mutations (login, register, photos).
+3. **Adobe Lightroom**: Optional; connect your catalog so the store serves your photos (see [backend/README_ADOBE.md](backend/README_ADOBE.md)).
+4. **TypeScript**: Used across the app and in route types.
+5. **Routing**: React Router 7 with routes defined in `app/routes.tsx`.
 
-## Production Considerations
+## Production considerations
 
-- Replace JSON file storage with a proper database
-- Use environment variables for sensitive configuration
-- Implement proper error boundaries and logging
-- Add comprehensive testing
-- Set up CI/CD pipeline
-- Configure proper CORS and security headers
+- Replace JSON file storage (e.g. `users.json`, `adobe-tokens.json`) with a proper database and secret store
+- Use environment variables for all secrets (Adobe credentials, JWT secret, etc.)
+- Do not use `ALLOW_INSECURE_SSL` in production; use valid TLS certificates
+- Add error boundaries, logging, tests, and CI/CD as needed
+- Configure CORS and security headers for your deployment
 
-## Learn More
+## Learn more
 
-- [React Router 7 Documentation](https://reactrouter.com/)
-- [React 19 Server Components](https://react.dev/)
+- [React Router 7](https://reactrouter.com/)
+- [React](https://react.dev/)
 - [Apollo GraphQL](https://www.apollographql.com/)
 - [Tailwind CSS](https://tailwindcss.com/)
+- **Adobe Lightroom**: [backend/README_ADOBE.md](backend/README_ADOBE.md)
