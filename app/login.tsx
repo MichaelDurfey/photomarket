@@ -1,19 +1,17 @@
 import { useState } from "react";
 import { useNavigate } from "react-router";
 import { useMutation } from "@apollo/client";
-import { REGISTER_USER } from "../lib/graphql";
+import { LOGIN_USER } from "./lib/graphql";
 
-export default function Register() {
+export default function Login() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  const [registerUser, { loading }] = useMutation(REGISTER_USER, {
+  const [loginUser, { loading }] = useMutation(LOGIN_USER, {
     onCompleted: (data) => {
-      if (data.register?.token) {
-        // Redirect to home page after successful registration
+      if (data.login?.token) {
         navigate("/");
       }
     },
@@ -26,13 +24,8 @@ export default function Register() {
     e.preventDefault();
     setError("");
 
-    if (password !== confirmPassword) {
-      setError("Passwords do not match");
-      return;
-    }
-
     try {
-      await registerUser({
+      await loginUser({
         variables: { username, password },
       });
     } catch (err) {
@@ -44,7 +37,7 @@ export default function Register() {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-          Create your account
+          Sign in to your account
         </h2>
       </div>
 
@@ -98,32 +91,12 @@ export default function Register() {
             </div>
 
             <div>
-              <label
-                htmlFor="confirmPassword"
-                className="block text-sm font-medium text-gray-700"
-              >
-                Confirm Password
-              </label>
-              <div className="mt-1">
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  required
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
-                />
-              </div>
-            </div>
-
-            <div>
               <button
                 type="submit"
                 disabled={loading}
                 className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
               >
-                {loading ? "Creating account..." : "Create account"}
+                {loading ? "Signing in..." : "Sign in"}
               </button>
             </div>
           </form>

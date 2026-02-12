@@ -4,7 +4,9 @@ export default {
   future: {
     v7_startTransition: true,
     v7_relativeSplatPath: true,
+    v8_middleware: true,
   },
   // Server-side rendering configuration
   serverModuleFormat: "esm",
+  ssr: true,
 };

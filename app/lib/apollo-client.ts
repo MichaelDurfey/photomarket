@@ -1,28 +1,36 @@
 import { ApolloClient, InMemoryCache, createHttpLink } from "@apollo/client";
-import { setContext } from "@apollo/client/link/context";
 
 const httpLink = createHttpLink({
-  uri: "http://localhost:3000/graphql",
+  uri: import.meta.env.VITE_GRAPHQL_URL || "http://localhost:3000/graphql",
   credentials: "include", // Include cookies for authentication
 });
 
-const authLink = setContext((_, { headers }) => {
-  return {
-    headers: {
-      ...headers,
-    },
-  };
-});
+/**
+ * Creates the Apollo Client instance for client-side rendering.
+ * If initial state is provided (from SSR), it will be used to hydrate the cache.
+ */
+export function createClient(initialState?: any) {
+  const cache = new InMemoryCache();
 
-export const client = new ApolloClient({
-  link: authLink.concat(httpLink),
-  cache: new InMemoryCache(),
-  defaultOptions: {
-    watchQuery: {
-      errorPolicy: "all",
+  // Restore cache from SSR if provided
+  if (initialState) {
+    cache.restore(initialState);
+  }
+
+  return new ApolloClient({
+    link: httpLink,
+    cache,
+    ssrMode: false, // Client-side mode
+    defaultOptions: {
+      watchQuery: {
+        errorPolicy: "all",
+      },
+      query: {
+        errorPolicy: "all",
+      },
     },
-    query: {
-      errorPolicy: "all",
-    },
-  },
-});
+  });
+}
+
+// Default client instance (will be hydrated on mount)
+export const client = createClient();
