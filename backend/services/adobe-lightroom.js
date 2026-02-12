@@ -433,7 +433,6 @@ class AdobeLightroomService {
                 .replace(/^\s*while\s*\(\s*1\s*\)\s*\{\s*\}\s*/i, "")
                 .trim();
               const parsed = JSON.parse(jsonStr);
-              console.log(`  → Response data preview:`, JSON.stringify(parsed));
               resolve(parsed);
             } catch (error) {
               console.log(`  → Non-JSON response:`, data.substring(0, 200));
@@ -551,6 +550,10 @@ class AdobeLightroomService {
   /**
    * Fetch a single rendition (image bytes) for use behind a proxy. Call with the
    * backend's OAuth token so <img src="..."> can use the proxy URL without exposing the token.
+   *
+   * Per the official Lightroom API docs, renditions are served from:
+   *   GET /v2/catalogs/{catalog_id}/assets/{asset_id}/renditions/{rendition_type}
+   *
    * @param {string} catalogId
    * @param {string} assetId
    * @param {string} [type='2048'] - Rendition type: thumbnail2x, 640, 1280, 2048 (standard), or fullsize/2560 (on-demand)
@@ -566,6 +569,7 @@ class AdobeLightroomService {
       );
     }
 
+    // Per Adobe docs, renditions are served from /v2/catalogs/{catalog_id}/assets/{asset_id}/renditions/{type}
     const endpoint = `/catalogs/${catalogId}/assets/${assetId}/renditions/${type}`;
     const url = resolveApiUrl(endpoint);
     const protocol = url.protocol === "https:" ? https : http;
@@ -585,6 +589,9 @@ class AdobeLightroomService {
           const chunks = [];
           res.on("data", (chunk) => chunks.push(chunk));
           res.on("end", () => {
+            const body = Buffer.concat(chunks);
+            const text = body.toString("utf8");
+
             if (res.statusCode === 401 && this.refreshToken) {
               this.refreshAccessToken(this.refreshToken)
                 .then(() => this.getRendition(catalogId, assetId, type))
@@ -592,23 +599,48 @@ class AdobeLightroomService {
                 .catch(reject);
               return;
             }
+
             if (res.statusCode < 200 || res.statusCode >= 300) {
+              let errorDetails = "";
+              try {
+                const parsed = JSON.parse(text);
+                if (parsed) {
+                  const parts = [];
+                  if (parsed.error) parts.push(`error=${parsed.error}`);
+                  if (parsed.error_description)
+                    parts.push(`description=${parsed.error_description}`);
+                  if (parsed.message) parts.push(`message=${parsed.message}`);
+                  if (parsed.reason) parts.push(`reason=${parsed.reason}`);
+                  if (parts.length) {
+                    errorDetails = " - " + parts.join("; ");
+                  }
+                }
+              } catch {
+                if (text) {
+                  errorDetails = " - " + text.substring(0, 300);
+                }
+              }
+
               reject(
                 new Error(
-                  `Rendition request failed: ${res.statusCode} ${res.statusMessage}`,
+                  `Rendition request failed: ${res.statusCode} ${res.statusMessage}${errorDetails}`,
                 ),
               );
               return;
             }
+
             const contentType = res.headers["content-type"] || "image/jpeg";
             resolve({
-              buffer: Buffer.concat(chunks),
+              buffer: body,
               contentType,
             });
           });
         },
       );
-      req.on("error", reject);
+      req.on("error", (error) => {
+        console.error("Error fetching rendition:", error);
+        reject(error);
+      });
       req.end();
     });
   }
@@ -662,7 +694,7 @@ class AdobeLightroomService {
       // Get assets from the catalog (or from a specific album if albumId is set)
       console.log("  → Fetching assets from catalog...");
       let assets = await this.getAssets(catalogId, fetchOptions);
-
+      console.log(`  → Assets: ${JSON.stringify(assets)}`);
       // Optional client-side filter by star rating (API does not support server-side rating filter)
       const minRating =
         options.minRating != null ? Number(options.minRating) : null;
@@ -686,22 +718,21 @@ class AdobeLightroomService {
       // are on-demand. Image is retrieved via GET {base}assets/{asset_id}/renditions/{type} (returns bytes).
       if (assets && assets.resources) {
         console.log(`  → Found ${assets.resources.length} assets`);
-        const RENDITION_TYPE = "2048";
+        const RENDITION_TYPE = "640";
         const photos = assets.resources.map((asset, index) => {
           // Use our backend proxy URL so <img src="..."> works without sending the OAuth token to the browser.
           // The proxy (GET /api/adobe/rendition/:catalogId/:assetId) adds the token when fetching from Adobe.
-          const proxyPath = asset.id
-            ? `/api/adobe/rendition/${catalogId}/${asset.id}?type=${RENDITION_TYPE}`
+          const proxyPath = asset.asset?.id
+            ? `/api/adobe/rendition/${catalogId}/${asset.asset.id}?type=${RENDITION_TYPE}`
             : "";
 
           const photo = {
-            id: asset.id || `adobe-${index + 1}`,
+            id: asset.asset?.id || `adobe-${index + 1}`,
             title: asset.caption || asset.filename || `Photo ${index + 1}`,
             url: proxyPath,
             price: options.defaultPrice || 10, // Default price, can be customized
             // Additional metadata from Adobe
             metadata: {
-              filename: asset.filename,
               created: asset.created,
               updated: asset.updated,
               catalogId: catalogId,

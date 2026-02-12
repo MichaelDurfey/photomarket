@@ -58,7 +58,7 @@ export async function loader(args: Route.LoaderArgs) {
       body: JSON.stringify({
         query: `
           query GetPhotos {
-            photos(albumName: "Europe 2025") {
+            photos(albumName: "favorites") {
               id
               title
               url

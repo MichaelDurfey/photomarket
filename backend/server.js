@@ -39,7 +39,7 @@ app.use(
       }
     },
     credentials: true,
-  })
+  }),
 );
 
 app.use(cookieParser());
@@ -57,7 +57,9 @@ app.get("/api/adobe/albums", async (req, res) => {
     res.json(albums);
   } catch (error) {
     console.error("Albums error:", error.message);
-    res.status(error.message?.includes("401") ? 401 : 502).json({ error: error.message });
+    res
+      .status(error.message?.includes("401") ? 401 : 502)
+      .json({ error: error.message });
   }
 });
 
@@ -72,6 +74,7 @@ app.get("/api/adobe/photos", async (req, res) => {
       minRating: parseInt(req.query.minRating, 10),
     }),
   };
+  console.log("Get Photo options:", options);
   const photos = await adobeLightroom.getPhotos(options);
   res.json(photos);
 });
@@ -80,19 +83,24 @@ app.get("/api/adobe/photos", async (req, res) => {
 // Frontend uses photo.url (e.g. /api/adobe/rendition/:catalogId/:assetId?type=2048) with this server as origin.
 app.get("/api/adobe/rendition/:catalogId/:assetId", async (req, res) => {
   const { catalogId, assetId } = req.params;
-  const type = req.query.type || "2048";
+  const type = req.query.type || "640";
   try {
     const { buffer, contentType } = await adobeLightroom.getRendition(
       catalogId,
       assetId,
-      type
+      type,
     );
     res.set("Content-Type", contentType);
     res.set("Cache-Control", "private, max-age=3600");
     res.send(buffer);
   } catch (error) {
-    console.error("Rendition proxy error:", error.message);
-    res.status(error.message.includes("401") ? 401 : 502).send();
+    const status =
+      error.message && error.message.includes("401")
+        ? 401
+        : error.message && error.message.includes("404")
+          ? 404
+          : 502;
+    res.status(status).json({ error: error.message });
   }
 });
 
@@ -130,7 +138,7 @@ app.get("/auth/adobe/callback", async (req, res) => {
     console.log(
       "Access token expires in:",
       tokenResponse.expires_in,
-      "seconds"
+      "seconds",
     );
 
     // In production, save tokens to database associated with user
@@ -259,7 +267,7 @@ async function startServer() {
 
     if (!SSL_KEY_PATH || !SSL_CERT_PATH) {
       throw new Error(
-        "HTTPS_ENABLED is true but SSL_KEY_PATH or SSL_CERT_PATH is not configured."
+        "HTTPS_ENABLED is true but SSL_KEY_PATH or SSL_CERT_PATH is not configured.",
       );
     }
 
@@ -276,10 +284,10 @@ async function startServer() {
 
   listener.listen(PORT, () => {
     console.log(
-      `🚀 Apollo Server ready at ${protocol}://localhost:${PORT}${server.graphqlPath}`
+      `🚀 Apollo Server ready at ${protocol}://localhost:${PORT}${server.graphqlPath}`,
     );
     console.log(
-      `📊 GraphQL Playground available at ${protocol}://localhost:${PORT}${server.graphqlPath}`
+      `📊 GraphQL Playground available at ${protocol}://localhost:${PORT}${server.graphqlPath}`,
     );
   });
 }
