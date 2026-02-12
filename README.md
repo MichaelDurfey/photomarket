@@ -1,6 +1,7 @@
-# Photo Store
+# Lightroom Photo Store
 
-This is a small photo store built with React Router 7, React, and a GraphQL backend. It lets you browse and sell photos, with an Adobe Lightroom integration so you can serve images directly from your own albums.
+A modern photo store application built with React Router 7, React 19 Server Components, and GraphQL with Apollo Server.
+Connects with the Adobe Lightroom APIs for Oauth, catalogs, assets and renditions.
 
 ## Install & run
 
