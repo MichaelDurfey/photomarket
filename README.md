@@ -18,6 +18,13 @@ npm run dev      # start React Router frontend (Vite, port 5173 by default)
 
 The frontend talks to the backend’s `/graphql` endpoint. If you change ports or enable HTTPS, point the frontend at the correct URL via environment variables (see `backend/README.md` for details).
 
+### To sign in via Oauth to Adobe Lightroom
+
+- Make sure you're utilizing Https
+- navigate to the backend servers `/auth/adobe` endpoint.
+  (This should redirect you to adobe for the Oauth.)
+- Once you've logged in on the Adobe site, the temporary auth code must be added as a query param to the `/auth/adobe/callback?code=<your code>` route like so.
+
 ## Project structure (high level)
 
 ```text
