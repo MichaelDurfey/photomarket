@@ -19,6 +19,8 @@ interface NodeFetchRequestInit extends RequestInit {
   agent?: https.Agent;
 }
 
+const ALBUM_NAME = process.env.DEFAULT_ALBUM_NAME || undefined;
+
 const allowInsecureSsl =
   typeof process !== "undefined" && process.env.ALLOW_INSECURE_SSL === "true";
 
@@ -26,22 +28,13 @@ if (allowInsecureSsl && typeof process !== "undefined") {
   process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
 }
 
-// Loader function for SSR data fetching
 export async function loader(args: Route.LoaderArgs) {
-  console.log("🔍 Loader called in index.tsx");
-
-  // Fetch directly from GraphQL API for SSR (loadContext is populated after loaders run)
-  // For SSR, we'll fetch directly from the backend GraphQL endpoint
   const graphqlUrl =
     process.env.GRAPHQL_URL || "https://localhost:3000/graphql";
 
-  console.log(`  → Fetching from GraphQL endpoint: ${graphqlUrl}`);
-
   const agent =
     allowInsecureSsl && typeof window === "undefined"
-      ? new https.Agent({
-          rejectUnauthorized: false,
-        })
+      ? new https.Agent({ rejectUnauthorized: false })
       : undefined;
 
   try {
@@ -50,15 +43,14 @@ export async function loader(args: Route.LoaderArgs) {
       ...(agent ? { agent } : {}),
       headers: {
         "Content-Type": "application/json",
-        // Pass cookies for authentication if available
         ...(args.request?.headers?.get("cookie") && {
           Cookie: args.request.headers.get("cookie")!,
         }),
       },
       body: JSON.stringify({
         query: `
-          query GetPhotos {
-            photos(albumName: "favorites") {
+          query GetPhotos($albumName: String) {
+            photos(albumName: $albumName) {
               id
               title
               url
@@ -66,6 +58,7 @@ export async function loader(args: Route.LoaderArgs) {
             }
           }
         `,
+        variables: { albumName: ALBUM_NAME },
       }),
     };
 
@@ -83,12 +76,9 @@ export async function loader(args: Route.LoaderArgs) {
     }
 
     const data = result.data as PhotosData;
-    console.log(
-      `✅ Loader fetched ${data.photos?.length || 0} photos from GraphQL`,
-    );
     return { photos: data.photos || [] };
   } catch (error) {
-    console.error("❌ Error fetching photos in loader:", error);
+    console.error("Error fetching photos in loader:", error);
     return { photos: [] };
   }
 }
@@ -96,16 +86,15 @@ export async function loader(args: Route.LoaderArgs) {
 export default function Index(props: Route.ComponentProps) {
   const loaderData = props.loaderData as { photos?: Photo[] } | undefined;
 
-  // Use loader data if available (SSR), otherwise fall back to client-side query
   const {
     data: queryData,
     loading,
     error,
   } = useQuery<PhotosData>(GET_PHOTOS, {
-    skip: !!loaderData?.photos, // Skip if we have SSR data
+    variables: { albumName: ALBUM_NAME },
+    skip: !!loaderData?.photos?.length,
   });
 
-  // Prefer SSR data, fall back to client query
   const photos = (loaderData?.photos || queryData?.photos || []) as Photo[];
   const isLoading = !loaderData && loading;
   const hasError = error;

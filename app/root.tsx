@@ -37,7 +37,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
-export default function Root(_props: any) {
+export default function Root() {
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow">

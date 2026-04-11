@@ -17,13 +17,16 @@ const HTTPS_ENABLED = process.env.HTTPS_ENABLED === "true";
 const SSL_KEY_PATH = process.env.SSL_KEY_PATH;
 const SSL_CERT_PATH = process.env.SSL_CERT_PATH;
 const SSL_PASSPHRASE = process.env.SSL_PASSPHRASE;
-const allowedOrigins = [
+const defaultOrigins = [
   "http://localhost",
   "http://localhost:3001",
   "https://localhost",
   "https://localhost:3001",
   "https://studio.apollographql.com",
 ];
+const allowedOrigins = process.env.CORS_ORIGINS
+  ? process.env.CORS_ORIGINS.split(",").map((s) => s.trim())
+  : defaultOrigins;
 
 // CORS configuration
 app.use(
@@ -74,9 +77,15 @@ app.get("/api/adobe/photos", async (req, res) => {
       minRating: parseInt(req.query.minRating, 10),
     }),
   };
-  console.log("Get Photo options:", options);
-  const photos = await adobeLightroom.getPhotos(options);
-  res.json(photos);
+  try {
+    const photos = await adobeLightroom.getPhotos(options);
+    res.json(photos);
+  } catch (error) {
+    console.error("Photos error:", error.message);
+    res
+      .status(error.message?.includes("401") ? 401 : 502)
+      .json({ error: error.message });
+  }
 });
 
 // Proxy for Adobe rendition images so <img src="..."> works without exposing the OAuth token.
@@ -108,7 +117,10 @@ app.get("/auth/adobe/callback", async (req, res) => {
   const { code, error } = req.query;
 
   if (error) {
-    return res.status(400).send(`Authentication failed: ${error}`);
+    const safeError = String(error).replace(/[<>"'&]/g, (c) =>
+      ({ "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;", "&": "&amp;" })[c]
+    );
+    return res.status(400).send(`Authentication failed: ${safeError}`);
   }
 
   if (!code) {
@@ -131,18 +143,6 @@ app.get("/auth/adobe/callback", async (req, res) => {
 
   try {
     const tokenResponse = await adobeLightroom.exchangeCodeForToken(code);
-
-    // Store tokens (in production, save to database)
-    // For now, we'll just log them - you should store them securely
-    console.log("Adobe authentication successful!");
-    console.log(
-      "Access token expires in:",
-      tokenResponse.expires_in,
-      "seconds",
-    );
-
-    // In production, save tokens to database associated with user
-    // For now, the service instance will hold the token
 
     res.send(`
       <html>
@@ -193,7 +193,7 @@ app.get("/auth/adobe/callback", async (req, res) => {
               if (window.opener) {
                 window.close();
               } else {
-                window.location.href = 'http://localhost:3001';
+                window.location.href = '${process.env.FRONTEND_URL || "http://localhost:3001"}';
               }
             }, 3000);
           </script>
@@ -235,18 +235,6 @@ const server = new ApolloServer({
       code: error.extensions?.code || "INTERNAL_SERVER_ERROR",
     };
   },
-  plugins: [
-    {
-      requestDidStart: () => ({
-        willSendResponse({ response }) {
-          // // Log successful operations
-          // if (response.data) {
-          //   console.log("GraphQL Operation", response.data);
-          // }
-        },
-      }),
-    },
-  ],
 });
 
 // Start the server

@@ -25,7 +25,10 @@ export default function AdobeConnect() {
 
   const checkStatus = async () => {
     try {
-      const response = await fetch("http://localhost:3000/api/adobe/status");
+      const apiBase = typeof window !== "undefined"
+        ? window.location.origin
+        : "http://localhost:3000";
+      const response = await fetch(`${apiBase}/api/adobe/status`);
       const data = await response.json();
       setStatus(data);
     } catch (error) {
@@ -57,7 +60,7 @@ export default function AdobeConnect() {
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
         <p className="text-sm text-blue-800">
           <strong>Store Setup:</strong> Adobe Lightroom account not connected. 
-          Visit <a href="http://localhost:3000/auth/adobe" target="_blank" rel="noopener noreferrer" className="underline font-medium">/auth/adobe</a> to connect your account.
+          Visit <a href="/auth/adobe" target="_blank" rel="noopener noreferrer" className="underline font-medium">/auth/adobe</a> to connect your account.
         </p>
       </div>
     );

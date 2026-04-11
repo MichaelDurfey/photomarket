@@ -1,41 +1,47 @@
 const jwt = require("jsonwebtoken");
 
-const SECRET_KEY = "your_secret_key"; // Use a strong secret key in production
-
-// Middleware to authenticate JWT
-const authenticateToken = (req, res, next) => {
-  const token = req.cookies.token;
-  if (!token) return res.sendStatus(401);
-
-  jwt.verify(token, SECRET_KEY, (err, user) => {
-    if (err) return res.sendStatus(403);
-    req.user = user;
-    next();
-  });
-};
-
-// GraphQL context function to add user to context
-const createContext = ({ req, res }) => {
-  let user = null;
-
-  const token = req.cookies.token;
-  if (token) {
-    try {
-      user = jwt.verify(token, SECRET_KEY);
-    } catch (error) {
-      // Token is invalid, but we don't throw here
-      // Let individual resolvers handle authentication
-    }
+function getSecretKey() {
+  const key = process.env.SECRET_KEY;
+  if (!key || key === "your_secret_key" || key === "your_secret_key_change_this_in_production") {
+    console.warn(
+      "⚠️  SECRET_KEY is not set or is using the default placeholder. " +
+      "Set a strong random string in your .env file for production use."
+    );
   }
+  return key || "your_secret_key";
+}
 
+function generateToken(user) {
+  return jwt.sign({ id: user.id, username: user.username }, getSecretKey(), {
+    expiresIn: "1h",
+  });
+}
+
+function verifyToken(token) {
+  try {
+    return jwt.verify(token, getSecretKey());
+  } catch {
+    return null;
+  }
+}
+
+function getUserFromRequest(req) {
+  const token = req.cookies?.token;
+  if (!token) return null;
+  return verifyToken(token);
+}
+
+const createContext = ({ req, res }) => {
   return {
     req,
     res,
-    user,
+    user: getUserFromRequest(req),
   };
 };
 
 module.exports = {
-  authenticateToken,
+  generateToken,
+  verifyToken,
+  getUserFromRequest,
   createContext,
 };

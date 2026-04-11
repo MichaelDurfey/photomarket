@@ -9,8 +9,7 @@ import Index from "./index";
 import Login from "./login";
 import Register from "./register";
 
-// Get Apollo cache state from SSR if available
-const apolloState = (window as any).__APOLLO_STATE__;
+const apolloState = (window as Window & { __APOLLO_STATE__?: Parameters<typeof createClient>[0] }).__APOLLO_STATE__;
 
 // Create Apollo Client with SSR cache state
 const apolloClient = createClient(apolloState);
@@ -22,7 +21,7 @@ const router = createBrowserRouter([
     children: [
       {
         index: true,
-        element: <Index {...({} as any)} />,
+        element: <Index {...({ loaderData: undefined } as Parameters<typeof Index>[0])} />,
       },
       {
         path: "login",

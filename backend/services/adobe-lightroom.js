@@ -81,31 +81,14 @@ class AdobeLightroomService {
   loadTokens() {
     try {
       if (fs.existsSync(TOKENS_FILE)) {
-        console.log("📂 Loading Adobe tokens from file...");
         const tokensData = JSON.parse(fs.readFileSync(TOKENS_FILE, "utf-8"));
         this.accessToken = tokensData.accessToken;
         this.refreshToken = tokensData.refreshToken;
         this.tokenExpiresAt = tokensData.tokenExpiresAt;
 
-        console.log(
-          `  → Access token: ${this.accessToken ? "loaded" : "missing"}`,
-        );
-        console.log(
-          `  → Refresh token: ${this.refreshToken ? "loaded" : "missing"}`,
-        );
-        console.log(`  → Token expires: ${this.tokenExpiresAt || "unknown"}`);
-
-        // Check if token is expired
         if (this.tokenExpiresAt && new Date() > new Date(this.tokenExpiresAt)) {
-          console.log(
-            "  ⚠️  Adobe token expired, will refresh on next request",
-          );
-          this.accessToken = null; // Force refresh
-        } else if (this.accessToken) {
-          console.log("  ✅ Adobe tokens loaded successfully");
+          this.accessToken = null;
         }
-      } else {
-        console.log("  ℹ️  No Adobe tokens file found - account not connected");
       }
     } catch (error) {
       console.warn("  ⚠️  Could not load Adobe tokens:", error.message);
@@ -187,12 +170,6 @@ class AdobeLightroomService {
       throw new Error("Authorization code is required");
     }
 
-    console.log("Exchanging authorization code for token...");
-    console.log(
-      "Client ID:",
-      this.clientId ? `${this.clientId.substring(0, 8)}...` : "MISSING",
-    );
-
     return new Promise((resolve, reject) => {
       // Adobe API expects form-encoded data, not JSON
       const params = new URLSearchParams({
@@ -230,23 +207,11 @@ class AdobeLightroomService {
             } else {
               // Save tokens to file for persistence
               const refreshToken = response.refresh_token || null;
-              if (!refreshToken) {
-                console.warn(
-                  "  ⚠️  No refresh_token in response - tokens will expire after 24 hours",
-                );
-              }
               this.saveTokens(
                 response.access_token,
                 refreshToken,
                 response.expires_in,
               );
-              console.log("  ✅ Tokens saved:", {
-                accessToken: "saved",
-                refreshToken: refreshToken ? "saved" : "MISSING",
-                expiresIn: response.expires_in
-                  ? `${response.expires_in}s`
-                  : "unknown",
-              });
               resolve(response);
             }
           } catch (error) {
@@ -342,9 +307,6 @@ class AdobeLightroomService {
         now >= expiresAt ||
         expiresAt.getTime() - now.getTime() < 5 * 60 * 1000
       ) {
-        console.log(
-          "  ⚠️  Access token expired or expiring soon, refreshing...",
-        );
         if (this.refreshToken) {
           try {
             await this.refreshAccessToken(this.refreshToken);
@@ -353,7 +315,6 @@ class AdobeLightroomService {
             this.accessToken = null; // Clear expired token
           }
         } else {
-          console.error("  ❌ No refresh token available - token expired");
           this.accessToken = null;
         }
       }
@@ -392,12 +353,11 @@ class AdobeLightroomService {
         },
       };
 
-      console.log(
-        `  → Making API request: ${requestOptions.method} https://${requestOptions.hostname}${requestOptions.path}`,
-      );
-      console.log(
-        `  → Headers: Authorization: Bearer token, X-API-Key: ${this.clientId ? `${this.clientId.substring(0, 8)}...` : "MISSING"}`,
-      );
+      if (process.env.DEBUG) {
+        console.log(
+          `  → API request: ${requestOptions.method} https://${requestOptions.hostname}${requestOptions.path}`,
+        );
+      }
 
       const protocol = url.protocol === "https:" ? https : http;
       const req = protocol.request(requestOptions, (res) => {
@@ -408,19 +368,14 @@ class AdobeLightroomService {
         });
 
         res.on("end", () => {
-          console.log(`  → API Response: ${res.statusCode} for ${endpoint}`);
-
           if (res.statusCode === 401) {
-            console.log("  ⚠️  Unauthorized - token may be expired");
             // Token expired, try to refresh
             if (this.refreshToken) {
-              console.log("  → Attempting to refresh token...");
               this.refreshAccessToken(this.refreshToken)
                 .then(() => this.makeRequest(endpoint, options))
                 .then(resolve)
                 .catch(reject);
             } else {
-              console.error("  ❌ No refresh token available");
               reject(
                 new Error("Authentication expired. Please re-authenticate."),
               );
@@ -457,12 +412,6 @@ class AdobeLightroomService {
             } catch {
               errorMessage += ` - ${data.substring(0, 200)}`;
             }
-
-            console.error(
-              `  ❌ API Error ${res.statusCode} for ${endpoint}:`,
-              errorMessage,
-            );
-            console.error(`  ❌ Full response:`, data.substring(0, 1000));
 
             // Special handling for 404 on /catalog
             if (res.statusCode === 404 && endpoint.includes("/catalog")) {
@@ -658,19 +607,13 @@ class AdobeLightroomService {
    */
   async getPhotos(options = {}) {
     try {
-      console.log("📸 Fetching photos from Adobe Lightroom...");
-
-      // Get the first catalog (or you can specify a catalog ID)
-      console.log("  → Fetching catalogs...");
       const catalogs = await this.getCatalogs();
 
       if (!catalogs || !catalogs.id) {
-        console.warn("  ⚠️  No catalogs found in Adobe Lightroom account");
         return [];
       }
 
       const catalogId = catalogs.id;
-      console.log(`  → Using catalog ID: ${catalogId}`);
 
       // Resolve album name to id if requested (e.g. "Europe 2025")
       let albumId = options.albumId;
@@ -682,19 +625,12 @@ class AdobeLightroomService {
         );
         if (album) {
           albumId = album.id;
-          console.log(
-            `  → Resolved album "${options.albumName}" to id: ${albumId}`,
-          );
-        } else {
-          console.warn(`  ⚠️  No album found with name "${options.albumName}"`);
         }
       }
       const fetchOptions = { ...options, albumId };
 
-      // Get assets from the catalog (or from a specific album if albumId is set)
-      console.log("  → Fetching assets from catalog...");
       let assets = await this.getAssets(catalogId, fetchOptions);
-      console.log(`  → Assets: ${JSON.stringify(assets)}`);
+      console.log(`  → Assets: ${assets?.resources?.length ?? 0} resources`);
       // Optional client-side filter by star rating (API does not support server-side rating filter)
       const minRating =
         options.minRating != null ? Number(options.minRating) : null;
@@ -707,9 +643,6 @@ class AdobeLightroomService {
             (a) => ratingValue(a) >= minRating,
           ),
         };
-        console.log(
-          `  → Filtered to ${assets.resources.length} assets with rating >= ${minRating} stars`,
-        );
       }
 
       // Transform Adobe Lightroom assets to our Photo format
@@ -717,7 +650,6 @@ class AdobeLightroomService {
       // "renditions" array. Standard types (thumbnail2x, 640, 1280, 2048) exist for all photos; fullsize/2560
       // are on-demand. Image is retrieved via GET {base}assets/{asset_id}/renditions/{type} (returns bytes).
       if (assets && assets.resources) {
-        console.log(`  → Found ${assets.resources.length} assets`);
         const RENDITION_TYPE = "640";
         const photos = assets.resources.map((asset, index) => {
           // Use our backend proxy URL so <img src="..."> works without sending the OAuth token to the browser.
@@ -744,15 +676,9 @@ class AdobeLightroomService {
         return photos;
       }
 
-      console.warn("  ⚠️  No assets found in catalog response");
       return [];
     } catch (error) {
-      console.error("❌ Error fetching photos from Lightroom:", error);
-      console.error("   Error details:", error.message);
-      if (error.stack) {
-        console.error("   Stack:", error.stack.substring(0, 500));
-      }
-      // Return empty array on error to prevent app crash
+      console.error("Error fetching photos from Lightroom:", error.message);
       return [];
     }
   }
@@ -785,11 +711,7 @@ class AdobeLightroomService {
    * Check if account is connected
    */
   isConnected() {
-    const connected = !!(this.accessToken || this.refreshToken);
-    console.log(
-      `  → isConnected() check: ${connected} (accessToken: ${!!this.accessToken}, refreshToken: ${!!this.refreshToken})`,
-    );
-    return connected;
+    return !!(this.accessToken || this.refreshToken);
   }
 }
 
