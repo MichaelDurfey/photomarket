@@ -63,29 +63,34 @@ sequenceDiagram
   API-->>Owner: Data or proxied image (/api/adobe/rendition/...)
 ```
 
-2. Shop user flow
+2. Shop user flow (OpenID Connect)
 
 ```mermaid
 sequenceDiagram
   autonumber
   actor User as Shop user (browser)
-  participant App as Remix app + Apollo
+  participant App as React Router app
+  participant API as Express backend :3000
+  participant IdP as OIDC provider
   participant GQL as Apollo /graphql
   participant Auth as auth.js (JWT)
 
-  User->>App: Submit login form
-  App->>GQL: mutation login(username, password)
-  GQL->>GQL: bcrypt verify, generateToken
-  GQL->>Auth: jwt.sign({ id, username })
-  GQL-->>User: Set-Cookie: token=... (httpOnly)
-  GQL-->>App: { token, user }
+  User->>App: GET /login → Continue with OIDC
+  User->>API: GET /auth/oidc/login
+  API->>IdP: 302 authorization (PKCE + state + nonce)
+  User->>IdP: Sign in + consent
+  IdP->>API: GET /auth/oidc/callback?code=...
+  API->>IdP: Token endpoint (code + PKCE verifier)
+  IdP-->>API: id_token / access_token
+  API->>API: upsert user by sub, jwt.sign
+  API-->>User: Set-Cookie token; redirect to FRONTEND_URL
 
-  User->>App: query me (with cookie)
-  App->>GQL: Cookie forwarded
+  User->>App: query me (cookie on /graphql)
+  App->>GQL: credentials include
   GQL->>Auth: verify cookie JWT
   GQL-->>App: current user or null
 ```
 
 ## More docs
 
-For API schema, HTTPS configuration, and Adobe Lightroom setup (OAuth and tokens), see the docs in the `backend` folder, especially `backend/README.md` and `backend/README_ADOBE.md`.
+For API schema, HTTPS configuration, and Adobe Lightroom setup (OAuth and tokens), see the docs in the `backend` folder, especially `backend/README.md` and `backend/README_ADOBE.md`. For shop customer OIDC, see `backend/README_OIDC.md`.

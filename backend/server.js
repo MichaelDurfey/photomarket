@@ -10,6 +10,9 @@ const typeDefs = require("./schema");
 const resolvers = require("./resolvers");
 const { createContext } = require("./auth");
 const adobeLightroom = require("./services/adobe-lightroom");
+const oidcShop = require("./services/oidc-shop");
+const { generateToken } = require("./auth");
+const { findOrCreateOidcUser } = require("./user-store");
 
 /** JS string literal safe to embed inside an inline HTML script (escapes `<` for HTML/script tokenization). */
 function jsStringLiteralForInlineScript(value) {
@@ -52,6 +55,59 @@ app.use(
 
 app.use(cookieParser());
 app.use(express.json());
+
+// Shop customer OIDC (OpenID Connect) — authorization code + PKCE
+app.get("/api/auth/oidc-status", (req, res) => {
+  res.json({ configured: oidcShop.isOidcConfigured() });
+});
+
+app.get("/auth/oidc/login", async (req, res) => {
+  if (!oidcShop.isOidcConfigured()) {
+    return res.status(503).send(`
+      <html><body><h1>OIDC not configured</h1>
+      <p>Set OIDC_ISSUER and OIDC_CLIENT_ID in <code>.env</code>. See backend/README_OIDC.md.</p>
+      </body></html>
+    `);
+  }
+  try {
+    const url = await oidcShop.startLogin(res);
+    res.redirect(url);
+  } catch (error) {
+    console.error("OIDC login start error:", error);
+    res.status(500).send(`Failed to start OIDC login: ${error.message}`);
+  }
+});
+
+app.get("/auth/oidc/callback", async (req, res) => {
+  const frontendRedirectUrl =
+    process.env.FRONTEND_URL || "http://localhost:3001";
+  const safeRedirect = (pathAndQuery) => {
+    res.redirect(`${frontendRedirectUrl}${pathAndQuery}`);
+  };
+
+  if (req.query.error) {
+    const msg = String(
+      req.query.error_description || req.query.error || "login_failed",
+    );
+    return safeRedirect(`/login?error=${encodeURIComponent(msg)}`);
+  }
+
+  try {
+    const tokenSet = await oidcShop.completeLogin(req, res);
+    const claims = tokenSet.claims();
+    const user = findOrCreateOidcUser(claims);
+    const token = generateToken(user);
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "Strict",
+    });
+    safeRedirect("/");
+  } catch (error) {
+    console.error("OIDC callback error:", error);
+    safeRedirect(`/login?error=${encodeURIComponent(error.message)}`);
+  }
+});
 
 // Adobe Lightroom OAuth routes
 app.get("/auth/adobe", (req, res) => {

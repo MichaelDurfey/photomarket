@@ -57,15 +57,6 @@ type Photo {
 }
 ```
 
-#### AuthPayload
-
-```graphql
-type AuthPayload {
-  token: String!
-  user: User!
-}
-```
-
 ### Queries
 
 #### Get all photos
@@ -107,33 +98,7 @@ query {
 
 ### Mutations
 
-#### Register a new user
-
-```graphql
-mutation {
-  register(username: "john_doe", password: "password123") {
-    token
-    user {
-      id
-      username
-    }
-  }
-}
-```
-
-#### Login
-
-```graphql
-mutation {
-  login(username: "john_doe", password: "password123") {
-    token
-    user {
-      id
-      username
-    }
-  }
-}
-```
+Shop sign-in uses **OpenID Connect** (see `README_OIDC.md`), not GraphQL mutations.
 
 #### Logout
 
@@ -145,14 +110,12 @@ mutation {
 
 ## Authentication
 
-The API uses JWT tokens stored in HTTP-only cookies for authentication. When you register or login, a token is automatically set in the cookie. The `me` query requires authentication and will return the current user's information.
+After a successful OIDC callback, the API sets a **JWT** in an **HTTP-only cookie** (`token`). The `logout` mutation clears it. The `me` query returns the current user when the cookie is present and valid. Configure the IdP in `.env` as described in `README_OIDC.md`.
 
 ## Error Handling
 
 The API includes comprehensive error handling for:
 
-- Invalid credentials
-- Username already exists
 - Invalid tokens
 - Missing required fields
 
