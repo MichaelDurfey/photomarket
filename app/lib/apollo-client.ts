@@ -9,7 +9,7 @@ const httpLink = createHttpLink({
  * Creates the Apollo Client instance for client-side rendering.
  * If initial state is provided (from SSR), it will be used to hydrate the cache.
  */
-export function createClient(initialState?: any) {
+export function createClient(initialState?: Parameters<InMemoryCache["restore"]>[0]) {
   const cache = new InMemoryCache();
 
   // Restore cache from SSR if provided

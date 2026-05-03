@@ -1,8 +1,8 @@
 import { gql } from "@apollo/client";
 
 export const GET_PHOTOS = gql`
-  query GetPhotos {
-    photos {
+  query GetPhotos($albumName: String) {
+    photos(albumName: $albumName) {
       id
       title
       url

@@ -1,0 +1,19 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+      - "3001:3001"
+    env_file:
+      - ./backend/.env
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - GRAPHQL_URL=http://localhost:3000/graphql
+      - FRONTEND_URL=http://localhost:3001
+    volumes:
+      - app-data:/app/backend/data
+    restart: unless-stopped
+
+volumes:
+  app-data:
