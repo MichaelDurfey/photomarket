@@ -1,52 +1,23 @@
-const bcrypt = require("bcrypt");
 const fs = require("fs");
 const path = require("path");
 const adobeLightroom = require("./services/adobe-lightroom");
-const { generateToken, getUserFromRequest } = require("./auth");
 
 const DATA_DIR = path.join(__dirname, "data");
-const USERS_FILE = path.join(DATA_DIR, "users.json");
 const PHOTOS_FILE = path.join(DATA_DIR, "photos.json");
-const USERS_FILE_LEGACY = path.join(__dirname, "users.json");
 const PHOTOS_FILE_LEGACY = path.join(__dirname, "photos.json");
 
-function ensureDataDir() {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
-const loadData = () => {
-  let photos = [];
-  let users = [];
-
-  try {
-    const usersPath = fs.existsSync(USERS_FILE)
-      ? USERS_FILE
-      : USERS_FILE_LEGACY;
-    users = JSON.parse(fs.readFileSync(usersPath, "utf-8"));
-  } catch {
-    users = [];
-  }
-
+const loadPhotos = () => {
   try {
     const photosPath = fs.existsSync(PHOTOS_FILE)
       ? PHOTOS_FILE
-      : PHOTOS_FILE_LEGACY;
-    photos = JSON.parse(fs.readFileSync(photosPath, "utf-8"));
+      : fs.existsSync(PHOTOS_FILE_LEGACY)
+        ? PHOTOS_FILE_LEGACY
+        : null;
+    if (!photosPath) return [];
+    return JSON.parse(fs.readFileSync(photosPath, "utf-8"));
   } catch {
-    photos = [];
+    return [];
   }
-
-  return { photos, users };
-};
-
-const saveUsers = (users) => {
-  ensureDataDir();
-  fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
-};
-
-const nextUserId = (users) => {
-  if (users.length === 0) return 1;
-  return Math.max(...users.map((u) => u.id)) + 1;
 };
 
 const resolvers = {
@@ -75,8 +46,7 @@ const resolvers = {
       };
 
       if (!adobeLightroom.isConnected()) {
-        const { photos } = loadData();
-        return photos;
+        return loadPhotos();
       }
 
       try {
@@ -88,8 +58,7 @@ const resolvers = {
         console.error("Error fetching from Adobe Lightroom:", error.message);
       }
 
-      const { photos } = loadData();
-      return photos;
+      return loadPhotos();
     },
 
     photo: async (_, { id }) => {
@@ -103,7 +72,7 @@ const resolvers = {
         }
       }
 
-      const { photos } = loadData();
+      const photos = loadPhotos();
       return photos.find((photo) => photo.id.toString() === id);
     },
 
@@ -113,61 +82,6 @@ const resolvers = {
   },
 
   Mutation: {
-    register: async (_, { username, password }, { res }) => {
-      const { users } = loadData();
-
-      // Check if user already exists
-      const existingUser = users.find((u) => u.username === username);
-      if (existingUser) {
-        throw new Error("Username already exists");
-      }
-
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const newUser = {
-        id: nextUserId(users),
-        username,
-        password: hashedPassword,
-      };
-
-      users.push(newUser);
-      saveUsers(users);
-
-      // Generate token and set cookie
-      const token = generateToken(newUser);
-      res.cookie("token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "Strict",
-      });
-
-      return {
-        token,
-        user: { id: newUser.id, username: newUser.username },
-      };
-    },
-
-    login: async (_, { username, password }, { res }) => {
-      const { users } = loadData();
-
-      const user = users.find((u) => u.username === username);
-      if (!user || !(await bcrypt.compare(password, user.password))) {
-        throw new Error("Invalid credentials");
-      }
-
-      // Generate token and set cookie
-      const token = generateToken(user);
-      res.cookie("token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "Strict",
-      });
-
-      return {
-        token,
-        user: { id: user.id, username: user.username },
-      };
-    },
-
     logout: (_, __, { res }) => {
       res.clearCookie("token");
       return true;

@@ -53,15 +53,9 @@ export default function Root() {
             <div className="flex items-center space-x-4">
               <Link
                 to="/login"
-                className="text-gray-500 hover:text-gray-700 px-3 py-2 rounded-md text-sm font-medium"
-              >
-                Login
-              </Link>
-              <Link
-                to="/register"
                 className="bg-indigo-600 text-white hover:bg-indigo-700 px-3 py-2 rounded-md text-sm font-medium"
               >
-                Register
+                Sign in
               </Link>
             </div>
           </div>

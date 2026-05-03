@@ -13,11 +13,6 @@ const typeDefs = gql`
     price: Float!
   }
 
-  type AuthPayload {
-    token: String!
-    user: User!
-  }
-
   type Album {
     id: ID!
     name: String
@@ -40,8 +35,6 @@ const typeDefs = gql`
   }
 
   type Mutation {
-    register(username: String!, password: String!): AuthPayload!
-    login(username: String!, password: String!): AuthPayload!
     logout: Boolean!
   }
 `;
