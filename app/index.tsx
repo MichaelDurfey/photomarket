@@ -19,8 +19,6 @@ interface NodeFetchRequestInit extends RequestInit {
   agent?: https.Agent;
 }
 
-const ALBUM_NAME = process.env.DEFAULT_ALBUM_NAME || undefined;
-
 const allowInsecureSsl =
   typeof process !== "undefined" && process.env.ALLOW_INSECURE_SSL === "true";
 
@@ -29,6 +27,7 @@ if (allowInsecureSsl && typeof process !== "undefined") {
 }
 
 export async function loader(args: Route.LoaderArgs) {
+  const albumName = process.env.DEFAULT_ALBUM_NAME || undefined;
   const graphqlUrl =
     process.env.GRAPHQL_URL || "https://localhost:3000/graphql";
 
@@ -58,7 +57,7 @@ export async function loader(args: Route.LoaderArgs) {
             }
           }
         `,
-        variables: { albumName: ALBUM_NAME },
+        variables: { albumName },
       }),
     };
 
@@ -72,26 +71,32 @@ export async function loader(args: Route.LoaderArgs) {
 
     if (result.errors) {
       console.error("GraphQL errors:", result.errors);
-      return { photos: [] };
+      return { photos: [], albumName };
     }
 
     const data = result.data as PhotosData;
-    return { photos: data.photos || [] };
+    return { photos: data.photos || [], albumName };
   } catch (error) {
     console.error("Error fetching photos in loader:", error);
-    return { photos: [] };
+    return {
+      photos: [],
+      albumName: process.env.DEFAULT_ALBUM_NAME || undefined,
+    };
   }
 }
 
 export default function Index(props: Route.ComponentProps) {
-  const loaderData = props.loaderData as { photos?: Photo[] } | undefined;
+  const loaderData = props.loaderData as
+    | { photos?: Photo[]; albumName?: string }
+    | undefined;
+  const albumName = loaderData?.albumName;
 
   const {
     data: queryData,
     loading,
     error,
   } = useQuery<PhotosData>(GET_PHOTOS, {
-    variables: { albumName: ALBUM_NAME },
+    variables: { albumName },
     skip: !!loaderData?.photos?.length,
   });
 

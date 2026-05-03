@@ -4,22 +4,34 @@ const path = require("path");
 const adobeLightroom = require("./services/adobe-lightroom");
 const { generateToken, getUserFromRequest } = require("./auth");
 
-const DATA_DIR = path.join(__dirname);
+const DATA_DIR = path.join(__dirname, "data");
 const USERS_FILE = path.join(DATA_DIR, "users.json");
 const PHOTOS_FILE = path.join(DATA_DIR, "photos.json");
+const USERS_FILE_LEGACY = path.join(__dirname, "users.json");
+const PHOTOS_FILE_LEGACY = path.join(__dirname, "photos.json");
+
+function ensureDataDir() {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+}
 
 const loadData = () => {
   let photos = [];
   let users = [];
 
   try {
-    users = JSON.parse(fs.readFileSync(USERS_FILE, "utf-8"));
+    const usersPath = fs.existsSync(USERS_FILE)
+      ? USERS_FILE
+      : USERS_FILE_LEGACY;
+    users = JSON.parse(fs.readFileSync(usersPath, "utf-8"));
   } catch {
     users = [];
   }
 
   try {
-    photos = JSON.parse(fs.readFileSync(PHOTOS_FILE, "utf-8"));
+    const photosPath = fs.existsSync(PHOTOS_FILE)
+      ? PHOTOS_FILE
+      : PHOTOS_FILE_LEGACY;
+    photos = JSON.parse(fs.readFileSync(photosPath, "utf-8"));
   } catch {
     photos = [];
   }
@@ -28,6 +40,7 @@ const loadData = () => {
 };
 
 const saveUsers = (users) => {
+  ensureDataDir();
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 };
 

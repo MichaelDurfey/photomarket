@@ -12,7 +12,7 @@ services:
       - GRAPHQL_URL=http://localhost:3000/graphql
       - FRONTEND_URL=http://localhost:3001
     volumes:
-      - app-data:/app/backend
+      - app-data:/app/backend/data
     restart: unless-stopped
 
 volumes:

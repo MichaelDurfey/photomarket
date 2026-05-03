@@ -12,6 +12,11 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      "/auth": {
+        target: "https://localhost:3000",
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
   build: {

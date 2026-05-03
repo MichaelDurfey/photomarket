@@ -11,6 +11,11 @@ const resolvers = require("./resolvers");
 const { createContext } = require("./auth");
 const adobeLightroom = require("./services/adobe-lightroom");
 
+/** JS string literal safe to embed inside an inline HTML script (escapes `<` for HTML/script tokenization). */
+function jsStringLiteralForInlineScript(value) {
+  return JSON.stringify(String(value)).replace(/</g, "\\u003c");
+}
+
 const app = express();
 const PORT = process.env.PORT || 3000;
 const HTTPS_ENABLED = process.env.HTTPS_ENABLED === "true";
@@ -143,6 +148,8 @@ app.get("/auth/adobe/callback", async (req, res) => {
 
   try {
     const tokenResponse = await adobeLightroom.exchangeCodeForToken(code);
+    const frontendRedirectUrl =
+      process.env.FRONTEND_URL || "http://localhost:3001";
 
     res.send(`
       <html>
@@ -193,7 +200,7 @@ app.get("/auth/adobe/callback", async (req, res) => {
               if (window.opener) {
                 window.close();
               } else {
-                window.location.href = '${process.env.FRONTEND_URL || "http://localhost:3001"}';
+                window.location.href = ${jsStringLiteralForInlineScript(frontendRedirectUrl)};
               }
             }, 3000);
           </script>

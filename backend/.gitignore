@@ -6,7 +6,9 @@ node_modules/
 .env.local
 .env.*.local
 
-# Adobe tokens (contains sensitive access tokens)
+# Runtime JSON under data/ (users, tokens, optional photos)
+data/
+# Legacy token path (still read by adobe-lightroom.js); never commit secrets
 adobe-tokens.json
 
 # SSL certs and keys (keep outside repo; set SSL_KEY_PATH/SSL_CERT_PATH in .env)

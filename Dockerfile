@@ -38,8 +38,8 @@ COPY --from=frontend-build /app/node_modules ./node_modules
 COPY backend/ ./backend/
 COPY --from=backend-deps /app/backend/node_modules ./backend/node_modules
 
-# Initialize empty data files if they don't exist
-RUN echo '[]' > /app/backend/users.json
+# Persisted JSON lives under backend/data (see docker-compose volume)
+RUN mkdir -p /app/backend/data && echo '[]' > /app/backend/data/users.json
 
 RUN chown -R appuser:appgroup /app
 USER appuser

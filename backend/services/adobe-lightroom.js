@@ -21,7 +21,8 @@ const path = require("path");
 
 const ADOBE_AUTH_URL = "https://ims-na1.adobelogin.com";
 const ADOBE_API_BASE = "https://lr.adobe.io/v2";
-const TOKENS_FILE = path.join(__dirname, "../adobe-tokens.json");
+const TOKENS_FILE = path.join(__dirname, "../data/adobe-tokens.json");
+const TOKENS_FILE_LEGACY = path.join(__dirname, "../adobe-tokens.json");
 
 const ensureTrailingSlash = (value) =>
   value.endsWith("/") ? value : `${value}/`;
@@ -80,8 +81,13 @@ class AdobeLightroomService {
    */
   loadTokens() {
     try {
-      if (fs.existsSync(TOKENS_FILE)) {
-        const tokensData = JSON.parse(fs.readFileSync(TOKENS_FILE, "utf-8"));
+      const tokensPath = fs.existsSync(TOKENS_FILE)
+        ? TOKENS_FILE
+        : fs.existsSync(TOKENS_FILE_LEGACY)
+          ? TOKENS_FILE_LEGACY
+          : null;
+      if (tokensPath) {
+        const tokensData = JSON.parse(fs.readFileSync(tokensPath, "utf-8"));
         this.accessToken = tokensData.accessToken;
         this.refreshToken = tokensData.refreshToken;
         this.tokenExpiresAt = tokensData.tokenExpiresAt;
@@ -111,6 +117,7 @@ class AdobeLightroomService {
         updatedAt: new Date().toISOString(),
       };
 
+      fs.mkdirSync(path.dirname(TOKENS_FILE), { recursive: true });
       fs.writeFileSync(TOKENS_FILE, JSON.stringify(tokensData, null, 2));
       this.accessToken = accessToken;
       this.refreshToken = refreshToken;
@@ -695,8 +702,8 @@ class AdobeLightroomService {
    */
   clearTokens() {
     try {
-      if (fs.existsSync(TOKENS_FILE)) {
-        fs.unlinkSync(TOKENS_FILE);
+      for (const f of [TOKENS_FILE, TOKENS_FILE_LEGACY]) {
+        if (fs.existsSync(f)) fs.unlinkSync(f);
       }
       this.accessToken = null;
       this.refreshToken = null;
