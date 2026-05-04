@@ -83,7 +83,7 @@ sequenceDiagram
   API->>IdP: Token endpoint (code + PKCE verifier)
   IdP-->>API: id_token / access_token
   API->>API: upsert user by sub, jwt.sign
-  API-->>User: Set-Cookie token; redirect to FRONTEND_URL
+  API-->>User: Set-Cookie token, redirect to FRONTEND_URL
 
   User->>App: query me (cookie on /graphql)
   App->>GQL: credentials include
